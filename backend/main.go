@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"net/http"
+
+	"backend/handlers"
 )
 
 type EchoRequest struct {
@@ -49,6 +51,9 @@ func main() {
 			"echo":req.Message,
 		})
 	})
+
+	// LLM endpoint
+	r.POST("/llm", handlers.HandleLLMRequest)
 
 	log.Printf("Starting server on port %s", port)
 	r.Run(":" + port)
