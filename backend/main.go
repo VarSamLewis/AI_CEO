@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"backend/handlers"
+	db "backend/database"
 )
 
 type EchoRequest struct {
@@ -20,6 +21,11 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: No .env file found")
 	}
+  
+	if err := db.InitDB(); err != nil {
+  	log.Fatalf("Failed to initialise db connection: %v", err)
+	}
+	defer db.DB.Close()
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")
@@ -35,6 +41,9 @@ func main() {
 			"status": "ok",
 		})
 	})
+
+	// Database Health Check
+	r.GET("/health/db", handlers.DBHealthCheck)
 
 	//Echo endpoint
 	r.POST("/echo", func(c *gin.Context) {
