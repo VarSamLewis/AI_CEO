@@ -27,6 +27,9 @@ func main() {
 	}
 	defer db.DB.Close()
 
+  if err := db.CreateUsersTable(); err != nil {
+      log.Fatalf("Failed to create users table: %v", err)
+  }
 	// Get port from environment or use default
 	port := os.Getenv("PORT")
 	if port == "" {
