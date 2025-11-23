@@ -1,6 +1,11 @@
 package database
 
-func CreateUsersTable() error {
+import (
+	"context"
+	"time"
+)
+
+func CreateUsersTable(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -11,6 +16,11 @@ func CreateUsersTable() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 	`
-	_, err := DB.Exec(query)
+
+	// Set timeout for table creation
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	_, err := DB.ExecContext(ctx, query)
 	return err
 }

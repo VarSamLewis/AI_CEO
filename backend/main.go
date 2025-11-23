@@ -1,19 +1,40 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"net/http"
 
 	"backend/handlers"
 	db "backend/database"
 )
 
-type EchoRequest struct {
-	Message string `json:"message" binding:"required"`
+type Config struct {
+	Port            string
+	DatabaseURL     string
+	AnthropicAPIKey string
+}
+
+func loadConfig() *Config {
+	return &Config{
+		Port:            getEnvOrDefault("PORT", "8080"),
+		DatabaseURL:     os.Getenv("TURSO_DATABASE_URL"),
+		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
+	}
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func main() {
@@ -21,54 +42,62 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: No .env file found")
 	}
+
+	// Load configuration
+	cfg := loadConfig()
   
 	if err := db.InitDB(); err != nil {
-  	log.Fatalf("Failed to initialise db connection: %v", err)
+		log.Fatalf("Failed to initialise db connection: %v", err)
 	}
 	defer db.DB.Close()
 
-  if err := db.CreateUsersTable(); err != nil {
-      log.Fatalf("Failed to create users table: %v", err)
-  }
-	// Get port from environment or use default
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// Create users table with context
+	if err := db.CreateUsersTable(context.Background()); err != nil {
+		log.Fatalf("Failed to create users table: %v", err)
 	}
 
 	r := gin.Default()
 
 	// Health Check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-		})
-	})
-
-	// Database Health Check
+	r.GET("/health", handlers.HealthCheck)
 	r.GET("/health/db", handlers.DBHealthCheck)
+	r.GET("/health/llm", handlers.LLMHealthCheck)
 
-	//Echo endpoint
-	r.POST("/echo", func(c *gin.Context) {
-		var req EchoRequest
-
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"echo":req.Message,
-		})
-	})
+	// Echo endpoint
+	r.POST("/echo", handlers.Echo)
 
 	// LLM endpoint
 	r.POST("/llm", handlers.HandleLLMRequest)
 
-	log.Printf("Starting server on port %s", port)
-	r.Run(":" + port)
+	// Create HTTP server
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: r,
+	}
 
+	// Start server in goroutine
+	go func() {
+		log.Printf("Starting server on port %s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed to start: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	// Graceful shutdown with 5 second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exited gracefully")
 }
 
