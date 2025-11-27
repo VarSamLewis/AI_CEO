@@ -57,8 +57,11 @@ func main() {
 	if err := db.CreateUsersTable(context.Background()); err != nil {
 		log.Fatalf("Failed to create users table: %v", err)
 	}
-  
-	
+
+	if err := db.CreateUserPreferenceTable(context.Background()); err != nil {
+		log.Fatalf("Failed to create user_preference_table table: %v", err)
+	}
+  	
 	r := gin.Default()
 
 	// Health Check
@@ -69,14 +72,15 @@ func main() {
 	// Echo endpoint
 	r.POST("/echo", handlers.Echo)
 
-	// LLM endpoint
-	r.POST("/llm", handlers.HandleLLMRequest)
-
+	// Auth routes
 	r.POST("/auth/register", auth.Register)
 	r.POST("/auth/login", auth.Login)
 
 	// Protected routes (require authentication)
+	r.POST("/llm", middleware.AuthMiddleware(), handlers.HandleLLMRequest)
 	r.GET("/api/profile", middleware.AuthMiddleware(), handlers.GetProfile)
+	r.GET("/api/preferences", middleware.AuthMiddleware(), handlers.GetPreferences)
+	r.PUT("/api/preferences", middleware.AuthMiddleware(), handlers.UpdatePreferences)
 
 	// Create HTTP server
 	srv := &http.Server{
