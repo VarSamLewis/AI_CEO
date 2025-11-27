@@ -14,6 +14,8 @@ import (
 
 	"backend/handlers"
 	db "backend/database"
+	"backend/auth"
+	"backend/middleware"
 )
 
 type Config struct {
@@ -55,7 +57,8 @@ func main() {
 	if err := db.CreateUsersTable(context.Background()); err != nil {
 		log.Fatalf("Failed to create users table: %v", err)
 	}
-
+  
+	
 	r := gin.Default()
 
 	// Health Check
@@ -68,6 +71,12 @@ func main() {
 
 	// LLM endpoint
 	r.POST("/llm", handlers.HandleLLMRequest)
+
+	r.POST("/auth/register", auth.Register)
+	r.POST("/auth/login", auth.Login)
+
+	// Protected routes (require authentication)
+	r.GET("/api/profile", middleware.AuthMiddleware(), handlers.GetProfile)
 
 	// Create HTTP server
 	srv := &http.Server{
