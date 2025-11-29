@@ -65,6 +65,26 @@ After discussion with my founding engineer, here's what we decided to build firs
 **Decision:** Measure repeat usage, not signups
 **Reasoning:** Anyone will try a free app once. The real question is: do they come back? If 10 people test it and 8 of them use it multiple times per week, we have something. If they use it once and forget, the idea doesn't work.
 
+### Decision 5: Monetization Strategy
+**Date:** November 27, 2025
+**Decision:** Free testing with usage caps (Week 3-4), then immediate paid launch (Week 5+)
+
+**Testing Phase (Week 3-4):**
+- Each tester gets 20 free meal generations
+- Total cost to founder: ~$5 (acceptable for validation)
+- Tell testers upfront: "This will cost $10/month after testing. Would you pay that?"
+- Tests willingness to pay WITHOUT payment friction affecting honest feedback
+
+**Launch Phase (Week 5+):**
+- **Pricing:** $10/month for unlimited meal generations
+- **Payment:** Stripe (2.9% + $0.30 per transaction)
+- **Unit Economics:** Power users (100 meals/month) cost <$1 in LLM fees, giving 90% margin
+- **Positioning:** Comparable to Netflix/Spotify pricing people understand
+
+**Reasoning:** No funding means we can't subsidize usage long-term. But $5 to validate with 15 real users is cheap market research. If they say "yes, I'd pay $10/month" and demonstrate repeat usage, we have product-market fit. Then we charge from day one of public launch. Usage caps during testing prevent cost explosion.
+
+**Technical Requirements:** Need usage tracking per user and rate limiting system to enforce 20-meal cap during testing.
+
 ## Technical Stack
 
 - Web application with user authentication
@@ -115,9 +135,15 @@ If we're right, this could help thousands of people eat better, waste less food,
 - Confirmed technical feasibility and cost structure
 - Engineer beginning development
 
+### November 27, 2025 - Week 1 Progress
+- Backend development mostly complete
+- Finalized monetization strategy: Free testing with usage caps, then $10/month subscription
+- Next: Implement usage tracking and rate limiting (20 meals/user during testing)
+- Next: Stripe payment integration for post-testing launch
+
 ---
 
 **Current Status:** In Development (Week 1)
-**Last Updated:** November 11, 2025
+**Last Updated:** November 27, 2025
 
 *This is a living document. Check back for updates as we build.*
