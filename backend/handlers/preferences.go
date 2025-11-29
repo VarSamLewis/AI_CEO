@@ -34,7 +34,7 @@ func GetPreferences(c *gin.Context) {
 
 	var prefJSON string
 	err := db.DB.QueryRowContext(ctx,
-		"SELECT user_preference FROM user_preference WHERE id = ?",
+		"SELECT user_preference FROM user_preference WHERE user_id = ?",
 		userID,
 	).Scan(&prefJSON)
 
@@ -90,9 +90,9 @@ func UpdatePreferences(c *gin.Context) {
 
 	// Upsert preferences (insert or update)
 	_, err = db.DB.ExecContext(ctx,
-		`INSERT INTO user_preference (id, user_preference, updated_at)
+		`INSERT INTO user_preference (user_id, user_preference, updated_at)
 		 VALUES (?, ?, datetime('now'))
-		 ON CONFLICT(id) DO UPDATE SET
+		 ON CONFLICT(user_id) DO UPDATE SET
 		 user_preference = excluded.user_preference,
 		 updated_at = excluded.updated_at`,
 		userID, string(prefJSON),

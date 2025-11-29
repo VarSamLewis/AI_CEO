@@ -35,7 +35,7 @@ func getUserPreferences(userID int64) (*UserPreferences, error) {
 
 	var prefJSON string
 	err := db.DB.QueryRowContext(ctx,
-		"SELECT user_preference FROM user_preference WHERE id = ?",
+		"SELECT user_preference FROM user_preference WHERE user_id = ?",
 		userID,
 	).Scan(&prefJSON)
 

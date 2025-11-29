@@ -9,11 +9,13 @@ func CreateUserPreferenceTable(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS user_preference (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_preference TEXT DEFAULT NULL, 
+		user_id INTEGER NOT NULL UNIQUE,
+		user_preference TEXT DEFAULT NULL,
 		created_at TEXT NOT NULL DEFAULT (datetime('now')),
-		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+		updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
-	CREATE INDEX IF NOT EXISTS idx_user_preference ON user_preference(id);
+	CREATE INDEX IF NOT EXISTS idx_user_preference_user_id ON user_preference(user_id);
 	`
 
 	// Set timeout for table creation
