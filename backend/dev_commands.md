@@ -141,6 +141,12 @@ echo $TOKEN
 
 ## Protected Endpoints (Require JWT)
 
+**Protected endpoints:**
+- `POST /llm` - Generate meal suggestions
+- `GET /api/profile` - Get user profile
+- `GET /api/preferences` - Get user preferences
+- `PUT /api/preferences` - Update user preferences
+
 ### Get User Profile
 ```bash
 # First, get a token (see above)
@@ -197,12 +203,81 @@ curl -X POST http://localhost:8080/echo \
   }'
 ```
 
-### LLM Request
+### LLM Request (Requires Authentication)
 ```bash
+# First, get a token
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  | jq -r '.token')
+
+# Then make LLM request with token
 curl -X POST http://localhost:8080/llm \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "prompt": "What is Go?"
+    "message": "Rice, soy sauce, yoghurt, onion, peppers, beansprouts and tofu"
+  }'
+```
+
+---
+
+## User Preferences
+
+### Get User Preferences
+```bash
+# Get token first
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  | jq -r '.token')
+
+# Get preferences
+curl http://localhost:8080/api/preferences \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Set/Update User Preferences
+```bash
+# Get token first
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  | jq -r '.token')
+
+# Update preferences
+curl -X PUT http://localhost:8080/api/preferences \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "dietary_restrictions": "vegetarian,gluten-free",
+    "max_cooking_time": 30
+  }'
+```
+
+### Complete Workflow: Set Preferences + Get Meal Suggestions
+```bash
+# 1. Get token
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  | jq -r '.token')
+
+# 2. Set preferences
+curl -X PUT http://localhost:8080/api/preferences \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "dietary_restrictions": "vegetarian",
+    "max_cooking_time": 30
+  }'
+
+# 3. Get meal suggestions (preferences are automatically included)
+curl -X POST http://localhost:8080/llm \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "message": "Rice, tofu, soy sauce, peppers, onions"
   }'
 ```
 
