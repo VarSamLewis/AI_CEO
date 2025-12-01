@@ -146,6 +146,7 @@ echo $TOKEN
 - `GET /api/profile` - Get user profile
 - `GET /api/preferences` - Get user preferences
 - `PUT /api/preferences` - Update user preferences
+- `GET /api/usage` - Get usage statistics (meal generation count)
 
 ### Get User Profile
 ```bash
@@ -279,6 +280,56 @@ curl -X POST http://localhost:8080/llm \
   -d '{
     "message": "Rice, tofu, soy sauce, peppers, onions"
   }'
+```
+
+---
+
+## Usage Tracking
+
+### Get Usage Statistics
+```bash
+# Get token first
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  | jq -r '.token')
+
+# Get usage stats
+curl http://localhost:8080/api/usage \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "used": 5,
+    "remaining": 15,
+    "limit": 20
+  }
+}
+```
+
+### Test Usage Limit (20 meals)
+```bash
+# Get token
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  | jq -r '.token')
+
+# Make multiple meal requests
+for i in {1..21}; do
+  echo "Request $i:"
+  curl -s -X POST http://localhost:8080/llm \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d '{"message": "Test meal generation"}' | jq '.data.usage'
+  echo "---"
+done
+
+# Request 21 should fail with "Usage limit reached"
 ```
 
 ---
