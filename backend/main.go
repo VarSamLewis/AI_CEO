@@ -80,7 +80,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Cookie"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -96,6 +96,7 @@ func main() {
 	// Auth routes
 	r.POST("/auth/register", auth.Register)
 	r.POST("/auth/login", auth.Login)
+	r.POST("/auth/logout", auth.Logout)
 
 	// Protected routes (require authentication)
 	r.POST("/llm", middleware.AuthMiddleware(), handlers.HandleLLMRequest)

@@ -73,10 +73,20 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// 7. Return success with token
+	// 7. Set httpOnly cookie (expires in 24 hours, same as JWT)
+	c.SetCookie(
+		"token",           // name
+		token,             // value
+		86400,             // maxAge in seconds (24 hours)
+		"/",               // path
+		"",                // domain (empty for same-origin)
+		false,             // secure (set to true in production with HTTPS)
+		true,              // httpOnly
+	)
+
+	// 8. Return success without token in body
 	handlers.SuccessResponse(c, gin.H{
 		"message": "User registered successfully",
-		"token":   token,
 		"user": gin.H{
 			"id":    userID,
 			"email": req.Email,
