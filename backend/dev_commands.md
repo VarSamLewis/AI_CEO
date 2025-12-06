@@ -70,23 +70,26 @@ curl http://localhost:8080/health/llm
 
 ---
 
-## Authentication Endpoints
+## Authentication Endpoints (httpOnly Cookies)
 
-### Register New User (Returns JWT Token)
+**Note:** Authentication now uses httpOnly cookies instead of Bearer tokens for improved security against XSS attacks.
+
+### Register New User (Sets httpOnly Cookie)
 ```bash
-curl -X POST http://localhost:8080/auth/register \
+curl -i -X POST http://localhost:8080/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com",
     "password": "password123"
-  }'
+  }' \
+  -c cookies.txt
 ```
 
 **Response:**
 ```json
 {
   "message": "User registered successfully",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "status": "ok",
   "user": {
     "id": 1,
     "email": "test@example.com"
@@ -94,27 +97,49 @@ curl -X POST http://localhost:8080/auth/register \
 }
 ```
 
-### Login (Returns JWT Token)
+**Important:** The JWT token is now set as an httpOnly cookie (see `Set-Cookie` header), not in the response body.
+
+### Login (Sets httpOnly Cookie)
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -i -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com",
     "password": "password123"
-  }'
+  }' \
+  -c cookies.txt
 ```
 
 **Response:**
 ```json
 {
   "message": "Login successful",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "status": "ok",
   "user": {
     "id": 1,
     "email": "test@example.com"
   }
 }
 ```
+
+The `-c cookies.txt` flag saves the cookie to a file for subsequent requests.
+
+### Logout (Clears httpOnly Cookie)
+```bash
+curl -i -X POST http://localhost:8080/auth/logout \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+**Response:**
+```json
+{
+  "message": "Logged out successfully",
+  "status": "ok"
+}
+```
+
+The cookie is cleared by setting `Max-Age=0`.
 
 ### Test Invalid Login
 ```bash
@@ -126,44 +151,33 @@ curl -X POST http://localhost:8080/auth/login \
   }'
 ```
 
-### Save Token to Variable
-```bash
-# Register or login and extract token
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "password123"}' \
-  | jq -r '.token')
-
-echo $TOKEN
-```
-
 ---
 
-## Protected Endpoints (Require JWT)
+## Protected Endpoints (Require Cookie Authentication)
 
 **Protected endpoints:**
 - `POST /llm` - Generate meal suggestions
 - `GET /api/profile` - Get user profile
 - `GET /api/preferences` - Get user preferences
 - `PUT /api/preferences` - Update user preferences
+- `GET /api/usage` - Get usage statistics (meal generation count)
 
 ### Get User Profile
 ```bash
-# First, get a token (see above)
-TOKEN="your-jwt-token-here"
+# First, login to get cookie (see above)
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  -c cookies.txt
 
+# Then access protected endpoint with cookie
 curl http://localhost:8080/api/profile \
-  -H "Authorization: Bearer $TOKEN"
+  -b cookies.txt
 ```
 
-### Using Saved Token Variable
-```bash
-# After saving token to $TOKEN variable
-curl http://localhost:8080/api/profile \
-  -H "Authorization: Bearer $TOKEN"
-```
+The `-b cookies.txt` flag sends the saved cookie with the request.
 
-### Test Unauthorized Access (No Token)
+### Test Unauthorized Access (No Cookie)
 ```bash
 curl http://localhost:8080/api/profile
 ```
@@ -171,21 +185,27 @@ curl http://localhost:8080/api/profile
 **Response:**
 ```json
 {
-  "error": "Authorization header required",
+  "message": "Authentication required",
   "status": "error"
 }
 ```
 
-### Test Invalid Token
+### Test After Logout (Cookie Cleared)
 ```bash
+# Logout to clear cookie
+curl -X POST http://localhost:8080/auth/logout \
+  -b cookies.txt \
+  -c cookies.txt
+
+# Try to access protected endpoint (should fail)
 curl http://localhost:8080/api/profile \
-  -H "Authorization: Bearer invalid-token"
+  -b cookies.txt
 ```
 
 **Response:**
 ```json
 {
-  "error": "Invalid or expired token",
+  "message": "Authentication required",
   "status": "error"
 }
 ```
@@ -205,16 +225,16 @@ curl -X POST http://localhost:8080/echo \
 
 ### LLM Request (Requires Authentication)
 ```bash
-# First, get a token
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+# First, login to get cookie
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}' \
-  | jq -r '.token')
+  -c cookies.txt
 
-# Then make LLM request with token
+# Then make LLM request with cookie
 curl -X POST http://localhost:8080/llm \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt \
   -d '{
     "message": "Rice, soy sauce, yoghurt, onion, peppers, beansprouts and tofu"
   }'
@@ -226,29 +246,29 @@ curl -X POST http://localhost:8080/llm \
 
 ### Get User Preferences
 ```bash
-# Get token first
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+# Login first
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}' \
-  | jq -r '.token')
+  -c cookies.txt
 
 # Get preferences
 curl http://localhost:8080/api/preferences \
-  -H "Authorization: Bearer $TOKEN"
+  -b cookies.txt
 ```
 
 ### Set/Update User Preferences
 ```bash
-# Get token first
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+# Login first
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}' \
-  | jq -r '.token')
+  -c cookies.txt
 
 # Update preferences
 curl -X PUT http://localhost:8080/api/preferences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt \
   -d '{
     "dietary_restrictions": "vegetarian,gluten-free",
     "max_cooking_time": 30
@@ -257,16 +277,16 @@ curl -X PUT http://localhost:8080/api/preferences \
 
 ### Complete Workflow: Set Preferences + Get Meal Suggestions
 ```bash
-# 1. Get token
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+# 1. Login and save cookie
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}' \
-  | jq -r '.token')
+  -c cookies.txt
 
 # 2. Set preferences
 curl -X PUT http://localhost:8080/api/preferences \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt \
   -d '{
     "dietary_restrictions": "vegetarian",
     "max_cooking_time": 30
@@ -275,10 +295,60 @@ curl -X PUT http://localhost:8080/api/preferences \
 # 3. Get meal suggestions (preferences are automatically included)
 curl -X POST http://localhost:8080/llm \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt \
   -d '{
     "message": "Rice, tofu, soy sauce, peppers, onions"
   }'
+```
+
+---
+
+## Usage Tracking
+
+### Get Usage Statistics
+```bash
+# Login first
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  -c cookies.txt
+
+# Get usage stats
+curl http://localhost:8080/api/usage \
+  -b cookies.txt
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "used": 5,
+    "remaining": 15,
+    "limit": 20
+  }
+}
+```
+
+### Test Usage Limit (20 meals)
+```bash
+# Login first
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}' \
+  -c cookies.txt
+
+# Make multiple meal requests
+for i in {1..21}; do
+  echo "Request $i:"
+  curl -s -X POST http://localhost:8080/llm \
+    -H "Content-Type: application/json" \
+    -b cookies.txt \
+    -d '{"message": "Test meal generation"}' | jq '.data.usage'
+  echo "---"
+done
+
+# Request 21 should fail with "Usage limit reached"
 ```
 
 ---
@@ -371,35 +441,43 @@ git push origin dev
 
 ## Quick Test Flow
 
-### Full Authentication Test with JWT
+### Full Authentication Test with httpOnly Cookies
 ```bash
 # 1. Start server (in one terminal)
 go run main.go
 
-# 2. Register user and save token (in another terminal)
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/register \
+# 2. Register user and save cookie (in another terminal)
+curl -i -X POST http://localhost:8080/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "test123"}' \
-  | jq -r '.token')
+  -c cookies.txt
 
-echo "Token: $TOKEN"
-
-# 3. Access protected endpoint with token
+# 3. Access protected endpoint with cookie
 curl http://localhost:8080/api/profile \
-  -H "Authorization: Bearer $TOKEN"
+  -b cookies.txt
 
-# 4. Try accessing without token (should fail)
+# 4. Try accessing without cookie (should fail)
 curl http://localhost:8080/api/profile
 
 # 5. Login with correct credentials
-curl -X POST http://localhost:8080/auth/login \
+curl -i -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "test123"}'
+  -d '{"email": "test@example.com", "password": "test123"}' \
+  -c cookies.txt
 
 # 6. Try wrong password
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "wrong"}'
+
+# 7. Logout (clear cookie)
+curl -i -X POST http://localhost:8080/auth/logout \
+  -b cookies.txt \
+  -c cookies.txt
+
+# 8. Try accessing protected endpoint after logout (should fail)
+curl http://localhost:8080/api/profile \
+  -b cookies.txt
 ```
 
 ---

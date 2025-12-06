@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	"github.com/joho/godotenv"
 
 	"backend/handlers"
@@ -59,10 +61,29 @@ func main() {
 	}
 
 	if err := db.CreateUserPreferenceTable(context.Background()); err != nil {
-		log.Fatalf("Failed to create user_preference_table table: %v", err)
+		log.Fatalf("Failed to create user_preference table: %v", err)
+	}
+
+	if err := db.CreateUsersTrackingTable(context.Background()); err != nil {
+		log.Fatalf("Failed to create user_tracking table: %v", err)
 	}
   	
 	r := gin.Default()
+
+	// CORS configuration
+	allowedOrigins := []string{"http://localhost:3000"} // Default for development
+
+	if originsEnv := os.Getenv("ALLOWED_ORIGINS"); originsEnv != "" {
+		allowedOrigins = strings.Split(originsEnv, ",")
+	}
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Cookie"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Health Check
 	r.GET("/health", handlers.HealthCheck)
@@ -75,12 +96,14 @@ func main() {
 	// Auth routes
 	r.POST("/auth/register", auth.Register)
 	r.POST("/auth/login", auth.Login)
+	r.POST("/auth/logout", auth.Logout)
 
 	// Protected routes (require authentication)
 	r.POST("/llm", middleware.AuthMiddleware(), handlers.HandleLLMRequest)
 	r.GET("/api/profile", middleware.AuthMiddleware(), handlers.GetProfile)
 	r.GET("/api/preferences", middleware.AuthMiddleware(), handlers.GetPreferences)
 	r.PUT("/api/preferences", middleware.AuthMiddleware(), handlers.UpdatePreferences)
+	r.GET("/api/usage", middleware.AuthMiddleware(), handlers.GetUsage)
 
 	// Create HTTP server
 	srv := &http.Server{
